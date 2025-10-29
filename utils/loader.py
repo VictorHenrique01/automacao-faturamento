@@ -1,6 +1,7 @@
 from pathlib import Path
 import pandas as pd
 from typing import Optional
+import unicodedata
 
 # Colunas aceitas/esperadas (em português, sem espaços/acentos)
 COLUNAS_ESPERADAS = [
@@ -25,8 +26,6 @@ def _normalizar_colunas(cols):
     new = []
     for c in cols:
         c2 = str(c).strip().lower().replace(" ", "_")
-        # manter apenas caracteres ascii simples (remove acentos se houver)
-        import unicodedata
         c2 = unicodedata.normalize("NFKD", c2).encode("ASCII", "ignore").decode()
         new.append(c2)
     return new
@@ -35,6 +34,7 @@ def carregar_arquivos(pasta: Path) -> Optional[pd.DataFrame]:
     """
     Carrega todos os arquivos CSV/XLSX da pasta e concatena em um DataFrame.
     Normaliza nomes de coluna para o formato usado no projeto.
+    Adiciona coluna 'source_file' com o nome do arquivo de origem para escrita posterior.
     """
     if not pasta.exists():
         raise FileNotFoundError(f"Pasta {pasta} não encontrada.")
@@ -48,6 +48,8 @@ def carregar_arquivos(pasta: Path) -> Optional[pd.DataFrame]:
                 df = pd.read_excel(arquivo)
             # normalizar colunas
             df.columns = _normalizar_colunas(df.columns)
+            # adicionar coluna de origem para cada linha
+            df["source_file"] = arquivo.name
             dados.append(df)
 
     if not dados:
@@ -55,20 +57,22 @@ def carregar_arquivos(pasta: Path) -> Optional[pd.DataFrame]:
 
     df_all = pd.concat(dados, ignore_index=True)
 
-    # tentar mapear colunas alternativas para nomes esperados (ex.: issue_date -> data_emissao)
+    # heurística de mapeamento para nomes esperados (english -> portugues)
     mapping = {}
     for expected in COLUNAS_ESPERADAS:
         if expected in df_all.columns:
             continue
-        # heurísticas de mapeamento:
         for col in df_all.columns:
             if col.replace("_", "") == expected.replace("_", ""):
                 mapping[col] = expected
-            # english -> portuguese simple matches
             elif col in ["issue_date", "invoice_id", "client_id", "client_name", "total"]:
                 if expected in ["data_emissao", "id_fatura", "id_cliente", "nome_cliente", "valor_total"]:
                     mapping[col] = expected
     if mapping:
         df_all = df_all.rename(columns=mapping)
+
+    # garantir coluna observacoes presente (vazia)
+    if "observacoes" not in df_all.columns:
+        df_all["observacoes"] = ""
 
     return df_all

@@ -3,8 +3,7 @@ import logging
 from logging_config import setup_logging
 from utils.loader import carregar_arquivos
 from utils.cleaner import limpar_dados, validar_colunas_esperadas
-from utils.reporter import gerar_relatorio
-# from utils.emailer import enviar_relatorio  # descomente se quiser enviar por email
+from utils.reporter import gerar_relatorio, salvar_observacoes_nos_arquivos
 
 def main():
     setup_logging()
@@ -19,7 +18,6 @@ def main():
         logging.warning("Nenhum dado carregado. Verifique a pasta data/input.")
         return
 
-    # validar e/ou mapear colunas
     col_ok = validar_colunas_esperadas(df)
     if not col_ok:
         logging.error("Colunas esperadas ausentes. Verifique o arquivo de entrada.")
@@ -30,10 +28,10 @@ def main():
     caminho_relatorio = pasta_output / "relatorio_faturamento.xlsx"
     gerar_relatorio(df_limpo, str(caminho_relatorio))
 
-    logging.info(f"Processamento concluído. Relatório salvo em: {caminho_relatorio}")
+    # SALVAR observações de volta nos arquivos de origem
+    salvar_observacoes_nos_arquivos(df_limpo, str(pasta_input))
 
-    # Opcional: enviar por email
-    # enviar_relatorio(caminho_relatorio, destinatarios=["financeiro@exemplo.com"])
+    logging.info(f"Processamento concluído. Relatório salvo em: {caminho_relatorio}")
 
 if __name__ == "__main__":
     main()
